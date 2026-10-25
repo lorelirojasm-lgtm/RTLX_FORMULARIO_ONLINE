@@ -52,18 +52,19 @@
   .fields span b{font-weight:bold}
 
   /* Ítems */
-  .item{padding:6px 0 2px;border-bottom:1px solid #e4e4e0}
+  .item{padding:20px 0 18px;border-bottom:1px solid #e4e4e0}
   .item:last-of-type{border-bottom:0}
-  .item .q{display:flex;gap:14px;align-items:baseline}
-  .item .q h2{min-width:170px}
-  .item .q p{margin:0;font-size:.86rem;line-height:1.3}
-  .scale{position:relative;height:28px;margin:8px 8px 0;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+  .item .q h2{text-transform:uppercase;font-size:1rem;letter-spacing:.4px;margin-bottom:6px}
+  .item .q p{margin:0;font-size:.95rem;line-height:1.45;max-width:72ch}
+  .scale{position:relative;height:36px;margin:22px 10px 0;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
   .scale:focus-visible{outline:2px solid var(--accent);outline-offset:6px}
   .scale .base{position:absolute;left:0;right:0;bottom:0;border-bottom:1.5px solid var(--ink)}
-  .scale .tick{position:absolute;bottom:0;width:0;border-left:1.5px solid var(--ink);height:50%;transform:translateX(-0.75px)}
+  /* Como en el formulario en papel: marcas cortas y largas alternadas, la central más alta */
+  .scale .tick{position:absolute;bottom:0;width:0;border-left:1.5px solid var(--ink);height:28%;transform:translateX(-0.75px)}
+  .scale .tick.long{height:62%}
   .scale .tick.mid{height:100%}
   .scale .mark{position:absolute;bottom:-6px;top:-6px;width:3px;background:var(--ink);transform:translateX(-1.5px);pointer-events:none}
-  .anch{display:flex;justify-content:space-between;margin:2px 0 0;font-size:.85rem;font-weight:bold}
+  .anch{display:flex;justify-content:space-between;margin:4px 0 0;font-size:.9rem;font-weight:bold}
   .missing .scale .base{border-bottom-color:var(--danger)}
   .missing h2{color:var(--danger)}
   #missMsg{color:var(--danger);font-size:.92rem;margin-top:10px}
@@ -73,36 +74,28 @@
   .tw{overflow-x:auto;margin-top:10px}
   @media (max-width:640px){
     .sheet{margin:0;border:0;padding:16px}
-    .item .q{flex-direction:column;gap:2px}
   }
 </style>
 </head>
 <body>
 
-<!-- 1. Investigador: conexión y datos de la sesión -->
+<!-- 1. Participante: código -->
 <section id="vSetup" class="sheet">
-  <h1>NASA-TLX (Raw) · Configuración de la sesión</h1>
-  <p class="muted">Pantalla para el investigador. Complete los datos antes de entregar la computadora al participante.</p>
+  <h1>Evaluación de la tarea</h1>
+  <p>Escriba el código de participante que le dio el investigador.</p>
 
-  <div id="odStatus" class="status">Verificando conexión con Google Sheets…</div>
-  <div class="row">
-    <button id="btnRetry" class="sec hidden">Subir pendientes</button>
-  </div>
-
-  <label class="f" for="inPid">ID del participante</label>
+  <label class="f" for="inPid">Código de participante</label>
   <input id="inPid" type="text" autocomplete="off" placeholder="p. ej. P01">
-  <label class="f" for="inCond">Condición</label>
-  <select id="inCond">
-    <option value="">Seleccione…</option>
-    <option>Agente socrático</option>
-    <option>Agente con prompt</option>
-  </select>
-  <label class="f" for="inTask">Tarea (opcional)</label>
-  <input id="inTask" type="text" autocomplete="off" placeholder="p. ej. Ejercicio 1">
 
-  <div class="row">
-    <button id="btnStart" disabled>Iniciar con el participante</button>
-    <button id="btnAdmin" class="sec">Ver datos guardados</button>
+  <div class="row"><button id="btnStart" disabled>Continuar</button></div>
+
+  <!-- Solo visible para el investigador (abrir la página con ?admin=1) -->
+  <div id="adminBox" class="hidden" style="margin-top:22px;border-top:1px solid var(--border);padding-top:14px">
+    <div id="odStatus" class="status">Verificando conexión con Google Sheets…</div>
+    <div class="row">
+      <button id="btnRetry" class="sec hidden">Subir pendientes</button>
+      <button id="btnAdmin" class="sec">Ver datos guardados en esta computadora</button>
+    </div>
   </div>
 </section>
 
@@ -122,7 +115,7 @@
     <h1>Índice de Carga de Tarea de NASA (NASA-TLX)</h1>
     <div class="fields">
       <span><b>Participante:</b> <span id="fPid"></span></span>
-      <span><b>Tarea:</b> <span id="fTask"></span></span>
+      <span id="fTaskWrap" class="hidden"><b>Tarea:</b> <span id="fTask"></span></span>
       <span><b>Fecha:</b> <span id="fDate"></span></span>
     </div>
   </div>
@@ -133,10 +126,14 @@
 
 <!-- 4. Fin -->
 <section id="vDone" class="sheet hidden">
-  <h1>¡Gracias!</h1>
-  <p>Sus respuestas se guardaron. Por favor avise al investigador.</p>
-  <p id="doneStatus" class="muted" style="font-size:.85rem"></p>
-  <div class="row"><button id="btnNext" class="sec">Siguiente participante (investigador)</button></div>
+  <div id="dSending"><h1>Enviando sus respuestas…</h1><p>Por favor no cierre esta página.</p></div>
+  <div id="dOk" class="hidden"><h1>¡Gracias!</h1><p>Sus respuestas se guardaron correctamente. Ya puede cerrar esta página.</p></div>
+  <div id="dFail" class="hidden">
+    <h1>No se pudieron enviar sus respuestas</h1>
+    <p>Revise su conexión a internet y toque <b>Reintentar</b>. Por favor <b>no cierre esta página</b> hasta ver el mensaje de confirmación.</p>
+    <div class="row"><button id="btnResend">Reintentar</button></div>
+  </div>
+  <div class="row"><button id="btnNext" class="sec hidden">Siguiente participante (investigador)</button></div>
 </section>
 
 <!-- 5. Datos -->
@@ -161,7 +158,7 @@ const SHEETS_URL = "https://script.google.com/macros/s/AKfycbxKXplkME5mIRJgGdA_n
 const SHEETS_KEY = "aOdwXJk-972yVouHRtW72IE5";
 /* ========================================================= */
 
-const VERSION = "rtlx-es-papel 1.1";
+const VERSION = "rtlx-es-papel 1.2";
 const K_ALL = "rtlx_es_todas_v1", K_QUEUE = "rtlx_es_pendientes_v1";
 
 const SCALES = [
@@ -189,7 +186,7 @@ const store = {
 function show(id){ ["vSetup","vInstr","vForm","vDone","vAdmin"].forEach(v=>$(v).classList.toggle("hidden", v!==id)); window.scrollTo(0,0); }
 
 /* ---------- Google Sheets (Apps Script) ---------- */
-let flushing = false, sheetOk = null, sheetRows = null;
+let sheetOk = null, sheetRows = null;
 function csvLine(r){ return COLS.map(c=>{ const v = r[c] ?? ""; return `"${String(v).replace(/"/g,'""')}"`; }).join(","); }
 
 async function ping(){
@@ -209,17 +206,20 @@ async function uploadOne(r){
   if(!d.ok) throw new Error(d.error || "error en la hoja");
   sheetOk = true; if(typeof d.filas === "number") sheetRows = d.filas;
 }
-async function flush(){
-  if(flushing || !SHEETS_URL) { renderStatus(); return; }
-  flushing = true;
-  try{
-    let q = store.get(K_QUEUE);
-    while(q.length){
-      await uploadOne(q[0]);
-      q = store.get(K_QUEUE); q.shift(); store.set(K_QUEUE, q);
-    }
-  }catch(e){ sheetOk = false; console.warn("Subida pendiente:", e.message); }
-  flushing = false; renderStatus();
+let flushP = null;
+function flush(){
+  if(!SHEETS_URL) { renderStatus(); return Promise.resolve(); }
+  if(flushP) return flushP;   // si ya hay un envío en curso, esperar ese mismo
+  flushP = (async () => {
+    try{
+      let q = store.get(K_QUEUE);
+      while(q.length){
+        await uploadOne(q[0]);
+        q = store.get(K_QUEUE); q.shift(); store.set(K_QUEUE, q);
+      }
+    }catch(e){ sheetOk = false; console.warn("Subida pendiente:", e.message); }
+  })().finally(() => { flushP = null; renderStatus(); });
+  return flushP;
 }
 function renderStatus(){
   const n = store.get(K_QUEUE).length, s = $("odStatus");
@@ -235,16 +235,22 @@ window.addEventListener("online", flush);
 
 /* ---------- Sesión ---------- */
 let sess = {}, answers = {}, cont = {};
-function checkSetup(){ $("btnStart").disabled = !($("inPid").value.trim() && $("inCond").value); }
-$("inPid").oninput = checkSetup; $("inCond").onchange = checkSetup;
+/* Parámetros opcionales del enlace: ?cond=...&tarea=...&id=...  ·  ?admin=1 muestra el panel del investigador */
+const QS = new URLSearchParams(location.search);
+const ADMIN = QS.get("admin") === "1";
+if(ADMIN) { $("adminBox").classList.remove("hidden"); $("btnNext").classList.remove("hidden"); }
+if(QS.get("id")) $("inPid").value = QS.get("id");
+function checkSetup(){ $("btnStart").disabled = !$("inPid").value.trim(); }
+$("inPid").oninput = checkSetup; checkSetup();
+$("inPid").addEventListener("keydown", e => { if(e.key==="Enter" && !$("btnStart").disabled) $("btnStart").click(); });
 $("btnStart").onclick = () => {
-  sess = { participante:$("inPid").value.trim(), condicion:$("inCond").value, tarea:$("inTask").value.trim() };
+  sess = { participante:$("inPid").value.trim(), condicion:QS.get("cond") || "", tarea:QS.get("tarea") || "" };
   show("vInstr");
 };
 $("btnToForm").onclick = () => {
   buildForm();
   $("fPid").textContent = sess.participante;
-  $("fTask").textContent = sess.tarea || "—";
+  $("fTask").textContent = sess.tarea; $("fTaskWrap").classList.toggle("hidden", !sess.tarea);
   $("fDate").textContent = new Date().toLocaleDateString("es-CR");
   sess.inicio = new Date();
   show("vForm");
@@ -260,7 +266,7 @@ function buildForm(){
     const sc = document.createElement("div"); sc.className = "scale"; sc.tabIndex = 0;
     sc.setAttribute("role","slider"); sc.setAttribute("aria-label", `${s.name}, de ${s.low} a ${s.high}`);
     sc.innerHTML = `<div class="base"></div>` +
-      Array.from({length:21},(_,i)=>`<div class="tick${i===10?" mid":""}" style="left:${i*5}%"></div>`).join("") +
+      Array.from({length:21},(_,i)=>`<div class="tick${i===10?" mid":(i%2===0?" long":"")}" style="left:${i*5}%"></div>`).join("") +
       `<div class="mark hidden"></div>`;
     const mark = sc.querySelector(".mark");
     const setPos = p => {
@@ -305,12 +311,19 @@ $("btnSubmit").onclick = () => {
   r.RTLX_cont = mean(SCALES.map(s=>cont[s.key]));
   const all = store.get(K_ALL); all.push(r);
   const q = store.get(K_QUEUE); q.push(r);
-  const ok = store.set(K_ALL, all) && store.set(K_QUEUE, q);
-  $("doneStatus").textContent = ok ? "" : "Aviso para el investigador: no se pudo guardar en este navegador.";
+  store.set(K_ALL, all); store.set(K_QUEUE, q);
   show("vDone");
-  flush();
+  sendAndConfirm();
 };
-$("btnNext").onclick = () => { $("inPid").value=""; $("inTask").value=""; $("inCond").value=""; checkSetup(); renderStatus(); show("vSetup"); };
+async function sendAndConfirm(){
+  ["dOk","dFail"].forEach(i=>$(i).classList.add("hidden")); $("dSending").classList.remove("hidden");
+  await flush();
+  const pending = store.get(K_QUEUE).length > 0 || !SHEETS_URL;
+  $("dSending").classList.add("hidden");
+  $(pending ? "dFail" : "dOk").classList.remove("hidden");
+}
+$("btnResend").onclick = sendAndConfirm;
+$("btnNext").onclick = () => { $("inPid").value=""; checkSetup(); renderStatus(); show("vSetup"); };
 
 /* ---------- Datos locales ---------- */
 function renderAdmin(){
