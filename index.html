@@ -56,6 +56,7 @@
   .item:last-of-type{border-bottom:0}
   .item .q h2{text-transform:uppercase;font-size:1rem;letter-spacing:.4px;margin-bottom:6px}
   .item .q p{margin:0;font-size:.95rem;line-height:1.45;max-width:72ch}
+  .item .q p.note{margin-top:8px;font-size:.9rem;font-style:italic}
   .scale{position:relative;height:36px;margin:22px 10px 0;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
   .scale:focus-visible{outline:2px solid var(--accent);outline-offset:6px}
   .scale .base{position:absolute;left:0;right:0;bottom:0;border-bottom:1.5px solid var(--ink)}
@@ -158,7 +159,7 @@ const SHEETS_URL = "https://script.google.com/macros/s/AKfycbxKXplkME5mIRJgGdA_n
 const SHEETS_KEY = "aOdwXJk-972yVouHRtW72IE5";
 /* ========================================================= */
 
-const VERSION = "rtlx-es-papel 1.2";
+const VERSION = "rtlx-es-papel 1.3";
 const K_ALL = "rtlx_es_todas_v1", K_QUEUE = "rtlx_es_pendientes_v1";
 
 const SCALES = [
@@ -169,6 +170,7 @@ const SCALES = [
   { key:"TD", name:"Exigencia temporal", low:"Baja", high:"Alta",
     desc:"¿Cuánta presión de tiempo sintió, debido al ritmo al cual se sucedían las tareas o los elementos de las tareas? ¿Era el ritmo lento y pausado o rápido y frenético?" },
   { key:"PE", name:"Rendimiento", low:"Bueno", high:"Malo",
+    note:"Atención: en esta escala el extremo izquierdo es <b>Bueno</b> y el derecho es <b>Malo</b>.",
     desc:"¿Hasta qué punto cree que ha tenido éxito en los objetivos establecidos por el investigador (o por usted mismo/a)? ¿Cuál es su grado de satisfacción con su nivel de ejecución?" },
   { key:"EF", name:"Esfuerzo", low:"Bajo", high:"Alto",
     desc:"¿En qué medida ha tenido que trabajar (física o mentalmente) para alcanzar su nivel de resultados?" },
@@ -262,7 +264,7 @@ function buildForm(){
   const box = $("items"); box.innerHTML = ""; $("missMsg").classList.add("hidden");
   SCALES.forEach(s => {
     const it = document.createElement("div"); it.className = "item"; it.id = "it_"+s.key;
-    it.innerHTML = `<div class="q"><h2>${s.name}</h2><p>${s.desc}</p></div>`;
+    it.innerHTML = `<div class="q"><h2>${s.name}</h2><p>${s.desc}</p>${s.note ? `<p class="note">${s.note}</p>` : ""}</div>`;
     const sc = document.createElement("div"); sc.className = "scale"; sc.tabIndex = 0;
     sc.setAttribute("role","slider"); sc.setAttribute("aria-label", `${s.name}, de ${s.low} a ${s.high}`);
     sc.innerHTML = `<div class="base"></div>` +
