@@ -18,8 +18,8 @@
   Textos en español: Arquer & Nogareda, NTP 544 (INSHT), con corrección ortográfica mínima
   y "@" reemplazado por "o/a".
 
-  Guardado: cada respuesta se guarda primero en este navegador y luego se sube a OneDrive
-  (carpeta de la aplicación) mediante Microsoft Graph. Ver README.md.
+  Guardado: cada respuesta se guarda primero en este navegador y luego se envía a una hoja
+  de Google Sheets mediante Apps Script (ver apps-script/Code.gs y README.md).
 -->
 <style>
   :root{
@@ -84,10 +84,8 @@
   <h1>NASA-TLX (Raw) · Configuración de la sesión</h1>
   <p class="muted">Pantalla para el investigador. Complete los datos antes de entregar la computadora al participante.</p>
 
-  <div id="odStatus" class="status">Verificando conexión con OneDrive…</div>
+  <div id="odStatus" class="status">Verificando conexión con Google Sheets…</div>
   <div class="row">
-    <button id="btnLogin" class="sec hidden">Conectar OneDrive</button>
-    <button id="btnLogout" class="sec hidden">Desconectar</button>
     <button id="btnRetry" class="sec hidden">Subir pendientes</button>
   </div>
 
@@ -154,17 +152,16 @@
   <p class="muted" style="font-size:.85rem;margin-top:10px">MD = Exigencia mental, PD = Exigencia física, TD = Exigencia temporal, PE = Rendimiento, EF = Esfuerzo, FR = Nivel de frustración. Sufijo _cont = posición continua; sin sufijo = puntaje en la escala de 20 intervalos (marca más cercana × 5).</p>
 </section>
 
-<script src="vendor/msal-browser.min.js"></script>
 <script>
 /* ===================== CONFIGURACIÓN =====================
-   Pegue aquí el "Application (client) ID" de su registro de aplicación en Microsoft Entra.
-   Si queda vacío, el formulario funciona igual pero solo guarda en este navegador. */
-const CLIENT_ID = "";
+   SHEETS_URL: la dirección de la "aplicación web" de Apps Script (termina en /exec).
+   SHEETS_KEY: debe ser igual a la CLAVE del archivo apps-script/Code.gs.
+   Si SHEETS_URL queda vacío, el formulario funciona igual pero solo guarda en este navegador. */
+const SHEETS_URL = "";
+const SHEETS_KEY = "aOdwXJk-972yVouHRtW72IE5";
 /* ========================================================= */
 
-const VERSION = "rtlx-es-papel 1.0";
-const SCOPES = ["Files.ReadWrite.AppFolder"];
-const CSV_NAME = "rtlx_respuestas.csv";
+const VERSION = "rtlx-es-papel 1.1";
 const K_ALL = "rtlx_es_todas_v1", K_QUEUE = "rtlx_es_pendientes_v1";
 
 const SCALES = [
@@ -191,65 +188,29 @@ const store = {
 };
 function show(id){ ["vSetup","vInstr","vForm","vDone","vAdmin"].forEach(v=>$(v).classList.toggle("hidden", v!==id)); window.scrollTo(0,0); }
 
-/* ---------- OneDrive (Microsoft Graph, carpeta de la aplicación) ---------- */
-let pca = null, account = null, flushing = false;
-
-async function initAuth(){
-  if(!CLIENT_ID || typeof msal === "undefined"){ renderStatus(); return; }
-  try{
-    pca = new msal.PublicClientApplication({
-      auth:{ clientId:CLIENT_ID, authority:"https://login.microsoftonline.com/consumers",
-             redirectUri: location.origin + location.pathname },
-      cache:{ cacheLocation:"localStorage" }
-    });
-    await pca.initialize();
-    const r = await pca.handleRedirectPromise();
-    account = (r && r.account) || pca.getAllAccounts()[0] || null;
-  }catch(e){ console.error(e); }
-  renderStatus(); flush();
-}
-async function token(){
-  if(!pca || !account) throw new Error("sin sesión");
-  try{ return (await pca.acquireTokenSilent({ scopes:SCOPES, account })).accessToken; }
-  catch(e){ account = null; renderStatus(); throw e; }
-}
-async function graph(path, opts={}){
-  const t = await token();
-  const res = await fetch("https://graph.microsoft.com/v1.0" + path,
-    { ...opts, headers:{ Authorization:"Bearer "+t, ...(opts.headers||{}) } });
-  return res;
-}
+/* ---------- Google Sheets (Apps Script) ---------- */
+let flushing = false, sheetOk = null, sheetRows = null;
 function csvLine(r){ return COLS.map(c=>{ const v = r[c] ?? ""; return `"${String(v).replace(/"/g,'""')}"`; }).join(","); }
 
+async function ping(){
+  if(!SHEETS_URL){ renderStatus(); return; }
+  try{
+    const res = await fetch(`${SHEETS_URL}?clave=${encodeURIComponent(SHEETS_KEY)}`);
+    const d = await res.json();
+    sheetOk = !!d.ok; sheetRows = d.filas ?? null;
+  }catch(e){ sheetOk = false; }
+  renderStatus();
+}
 async function uploadOne(r){
-  // 1) Archivo individual (nunca se sobrescribe)
-  let res = await graph(`/me/drive/special/approot:/respuestas/${encodeURIComponent(r.id_registro)}.json:/content`,
-    { method:"PUT", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(r, null, 2) });
-  if(!res.ok) throw new Error("JSON " + res.status);
-  // 2) CSV consolidado, con control de concurrencia (eTag)
-  for(let attempt=0; attempt<4; attempt++){
-    let meta = await graph(`/me/drive/special/approot:/${CSV_NAME}`);
-    let text = "﻿" + COLS.join(",") + "\r\n", etag = null;
-    if(meta.ok){
-      const m = await meta.json(); etag = m.eTag;
-      const c = await graph(`/me/drive/items/${m.id}/content`);
-      if(!c.ok) throw new Error("CSV leer " + c.status);
-      text = await c.text();
-      if(text.includes(`"${r.id_registro}"`)) return; // ya estaba
-      if(!text.endsWith("\n")) text += "\r\n";
-    } else if(meta.status !== 404){ throw new Error("CSV meta " + meta.status); }
-    text += csvLine(r) + "\r\n";
-    const headers = { "Content-Type":"text/csv; charset=utf-8" };
-    if(etag) headers["If-Match"] = etag;
-    res = await graph(`/me/drive/special/approot:/${CSV_NAME}:/content`, { method:"PUT", headers, body:text });
-    if(res.ok) return;
-    if(res.status !== 412 && res.status !== 409) throw new Error("CSV " + res.status);
-    await new Promise(s=>setTimeout(s, 400 + Math.random()*800));
-  }
-  throw new Error("CSV en uso, se reintentará");
+  // text/plain evita la verificación previa (CORS) que Apps Script no admite
+  const res = await fetch(SHEETS_URL, { method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" },
+    body: JSON.stringify({ clave:SHEETS_KEY, fila:r }) });
+  const d = await res.json();
+  if(!d.ok) throw new Error(d.error || "error en la hoja");
+  sheetOk = true; if(typeof d.filas === "number") sheetRows = d.filas;
 }
 async function flush(){
-  if(flushing || !account) { renderStatus(); return; }
+  if(flushing || !SHEETS_URL) { renderStatus(); return; }
   flushing = true;
   try{
     let q = store.get(K_QUEUE);
@@ -257,21 +218,18 @@ async function flush(){
       await uploadOne(q[0]);
       q = store.get(K_QUEUE); q.shift(); store.set(K_QUEUE, q);
     }
-  }catch(e){ console.warn("Subida pendiente:", e.message); }
+  }catch(e){ sheetOk = false; console.warn("Subida pendiente:", e.message); }
   flushing = false; renderStatus();
 }
 function renderStatus(){
   const n = store.get(K_QUEUE).length, s = $("odStatus");
-  $("btnLogin").classList.toggle("hidden", !CLIENT_ID || !!account);
-  $("btnLogout").classList.toggle("hidden", !account);
-  $("btnRetry").classList.toggle("hidden", !account || !n);
-  if(!CLIENT_ID){ s.className="status warn"; s.textContent = "OneDrive no configurado: las respuestas se guardan solo en este navegador. Descargue el respaldo CSV al terminar."; return; }
-  if(!account){ s.className="status warn"; s.textContent = `OneDrive desconectado. ${n} respuesta(s) pendiente(s) de subir. Conecte antes de iniciar.`; return; }
+  $("btnRetry").classList.toggle("hidden", !SHEETS_URL || !n);
+  if(!SHEETS_URL){ s.className="status warn"; s.textContent = "Google Sheets no configurado: las respuestas se guardan solo en este navegador. Descargue el respaldo CSV al terminar."; return; }
+  if(sheetOk === null){ s.className="status"; s.textContent = "Verificando conexión con Google Sheets…"; return; }
+  if(!sheetOk){ s.className="status warn"; s.textContent = `No se pudo conectar con Google Sheets (revise el internet). ${n} respuesta(s) pendiente(s); se subirán solas al volver la conexión.`; return; }
   s.className = n ? "status warn" : "status ok";
-  s.textContent = `Conectado a OneDrive como ${account.username}. ` + (n ? `${n} respuesta(s) pendiente(s) de subir.` : "Todo sincronizado.");
+  s.textContent = "Conectado a Google Sheets" + (sheetRows!==null ? ` (${sheetRows} respuesta(s) en la hoja). ` : ". ") + (n ? `${n} pendiente(s) de subir.` : "Todo sincronizado.");
 }
-$("btnLogin").onclick = () => pca && pca.loginRedirect({ scopes:SCOPES, prompt:"select_account" });
-$("btnLogout").onclick = () => pca && pca.logoutRedirect({ account });
 $("btnRetry").onclick = flush;
 window.addEventListener("online", flush);
 
@@ -357,7 +315,7 @@ $("btnNext").onclick = () => { $("inPid").value=""; $("inTask").value=""; $("inC
 /* ---------- Datos locales ---------- */
 function renderAdmin(){
   const all = store.get(K_ALL), q = store.get(K_QUEUE).length;
-  $("adminInfo").textContent = `${all.length} respuesta(s) en este navegador. ${q} pendiente(s) de subir a OneDrive.`;
+  $("adminInfo").textContent = `${all.length} respuesta(s) en este navegador. ${q} pendiente(s) de subir a Google Sheets.`;
   $("tbl").innerHTML = "<tr>"+COLS.map(c=>`<th>${c}</th>`).join("")+"</tr>" +
     all.map(r=>"<tr>"+COLS.map(c=>`<td>${r[c] ?? ""}</td>`).join("")+"</tr>").join("");
 }
@@ -372,12 +330,12 @@ $("btnCsv").onclick = () => {
 };
 $("btnClear").onclick = () => {
   const q = store.get(K_QUEUE).length;
-  const msg = q ? `Hay ${q} respuesta(s) que todavía NO se subieron a OneDrive y se perderían. ¿Borrar de todas formas?`
-                : "¿Borrar las respuestas guardadas en este navegador? (Ya están en OneDrive.)";
+  const msg = q ? `Hay ${q} respuesta(s) que todavía NO se subieron a Google Sheets y se perderían. ¿Borrar de todas formas?`
+                : "¿Borrar las respuestas guardadas en este navegador? (Ya están en Google Sheets.)";
   if(confirm(msg)){ store.set(K_ALL, []); store.set(K_QUEUE, []); renderAdmin(); }
 };
 
-initAuth();
+renderStatus(); ping().then(flush);
 </script>
 </body>
 </html>
