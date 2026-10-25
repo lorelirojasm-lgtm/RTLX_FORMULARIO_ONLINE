@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NASA-TLX (Raw) · Español</title>
+<!--
+  Réplica electrónica del NASA-TLX en papel, versión Raw (sin fase de ponderación).
+
+  Diseño basado en la "electronic facsimile" evaluada por Trujillo (2011),
+  NASA/TM-2011-217166, que no mostró diferencias significativas con la versión en papel:
+    - las seis escalas en una sola pantalla, cada una con su descripción;
+    - ninguna marca hasta que la persona toca la escala;
+    - al tocar, aparece una barra vertical en ese punto (escala continua).
+  Escala: línea de 20 intervalos iguales (21 marcas, la central más alta), puntaje 0–100
+  (Hart & Staveland, 1988; Arquer & Nogareda, NTP 544).
+  Sin números visibles en ningún momento.
+  Textos en español: Arquer & Nogareda, NTP 544 (INSHT), con corrección ortográfica mínima
+  y "@" reemplazado por "o/a".
+
+  Guardado: cada respuesta se guarda primero en este navegador y luego se sube a OneDrive
+  (carpeta de la aplicación) mediante Microsoft Graph. Ver README.md.
+-->
+<style>
+  :root{
+    --paper:#ffffff; --ink:#000000; --muted:#555555; --page:#e9e9e6;
+    --accent:#1f4fa3; --ok:#1d7a3a; --warn:#a35c00; --danger:#a32a1f; --border:#c9c9c4;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--page);color:var(--ink)}
+  body{font:15px/1.4 Helvetica,Arial,"Liberation Sans",sans-serif}
+  .sheet{max-width:860px;margin:10px auto;background:var(--paper);border:1px solid var(--border);padding:16px 28px 16px}
+  h1{font-size:1.25rem;margin:0 0 2px;letter-spacing:.2px}
+  h2{font-size:1.05rem;margin:0}
+  p{margin:0 0 10px}
+  .muted{color:var(--muted)}
+  .hidden{display:none!important}
+  label.f{display:block;font-weight:bold;margin:12px 0 4px}
+  input[type=text],select{width:100%;padding:9px;border:1px solid var(--border);border-radius:4px;font:inherit;background:#fff;color:#000}
+  button{font:inherit;padding:9px 18px;border-radius:4px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
+  button.sec{background:#fff;color:var(--accent)}
+  button.dang{background:#fff;color:var(--danger);border-color:var(--danger)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
+  .status{padding:8px 10px;border-radius:4px;border:1px solid var(--border);background:#fafaf8;font-size:.92rem}
+  .status.ok{border-color:var(--ok);color:var(--ok)}
+  .status.warn{border-color:var(--warn);color:var(--warn)}
+
+  /* Encabezado tipo formulario en papel */
+  .head{border-bottom:2px solid var(--ink);padding-bottom:8px;margin-bottom:6px}
+  .fields{display:flex;gap:24px;flex-wrap:wrap;font-size:.92rem;margin-top:6px}
+  .fields span b{font-weight:bold}
+
+  /* Ítems */
+  .item{padding:6px 0 2px;border-bottom:1px solid #e4e4e0}
+  .item:last-of-type{border-bottom:0}
+  .item .q{display:flex;gap:14px;align-items:baseline}
+  .item .q h2{min-width:170px}
+  .item .q p{margin:0;font-size:.86rem;line-height:1.3}
+  .scale{position:relative;height:28px;margin:8px 8px 0;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}
+  .scale:focus-visible{outline:2px solid var(--accent);outline-offset:6px}
+  .scale .base{position:absolute;left:0;right:0;bottom:0;border-bottom:1.5px solid var(--ink)}
+  .scale .tick{position:absolute;bottom:0;width:0;border-left:1.5px solid var(--ink);height:50%;transform:translateX(-0.75px)}
+  .scale .tick.mid{height:100%}
+  .scale .mark{position:absolute;bottom:-6px;top:-6px;width:3px;background:var(--ink);transform:translateX(-1.5px);pointer-events:none}
+  .anch{display:flex;justify-content:space-between;margin:2px 0 0;font-size:.85rem;font-weight:bold}
+  .missing .scale .base{border-bottom-color:var(--danger)}
+  .missing h2{color:var(--danger)}
+  #missMsg{color:var(--danger);font-size:.92rem;margin-top:10px}
+
+  table{border-collapse:collapse;width:100%;font-size:.8rem}
+  th,td{border:1px solid var(--border);padding:3px 5px;text-align:left;white-space:nowrap}
+  .tw{overflow-x:auto;margin-top:10px}
+  @media (max-width:640px){
+    .sheet{margin:0;border:0;padding:16px}
+    .item .q{flex-direction:column;gap:2px}
+  }
+</style>
+</head>
+<body>
+
+<!-- 1. Investigador: conexión y datos de la sesión -->
+<section id="vSetup" class="sheet">
+  <h1>NASA-TLX (Raw) · Configuración de la sesión</h1>
+  <p class="muted">Pantalla para el investigador. Complete los datos antes de entregar la computadora al participante.</p>
+
+  <div id="odStatus" class="status">Verificando conexión con OneDrive…</div>
+  <div class="row">
+    <button id="btnLogin" class="sec hidden">Conectar OneDrive</button>
+    <button id="btnLogout" class="sec hidden">Desconectar</button>
+    <button id="btnRetry" class="sec hidden">Subir pendientes</button>
+  </div>
+
+  <label class="f" for="inPid">ID del participante</label>
+  <input id="inPid" type="text" autocomplete="off" placeholder="p. ej. P01">
+  <label class="f" for="inCond">Condición</label>
+  <select id="inCond">
+    <option value="">Seleccione…</option>
+    <option>Agente socrático</option>
+    <option>Agente con prompt</option>
+  </select>
+  <label class="f" for="inTask">Tarea (opcional)</label>
+  <input id="inTask" type="text" autocomplete="off" placeholder="p. ej. Ejercicio 1">
+
+  <div class="row">
+    <button id="btnStart" disabled>Iniciar con el participante</button>
+    <button id="btnAdmin" class="sec">Ver datos guardados</button>
+  </div>
+</section>
+
+<!-- 2. Participante: instrucciones -->
+<section id="vInstr" class="sheet hidden">
+  <h1>Instrucciones</h1>
+  <p>Le pedimos que evalúe la tarea que acaba de realizar en seis escalas. Lea con atención la descripción de cada una.</p>
+  <p>En cada escala, haga clic sobre la línea en el punto que mejor represente su experiencia durante la tarea. Aparecerá una marca en ese punto. Si quiere cambiarla, haga clic en otro punto de la misma línea.</p>
+  <p>Tenga en cuenta que en la escala de <b>Rendimiento</b> el extremo izquierdo es <b>Bueno</b> y el derecho es <b>Malo</b>.</p>
+  <p>No hay respuestas correctas ni incorrectas.</p>
+  <div class="row"><button id="btnToForm">Comenzar</button></div>
+</section>
+
+<!-- 3. Participante: formulario -->
+<section id="vForm" class="sheet hidden">
+  <div class="head">
+    <h1>Índice de Carga de Tarea de NASA (NASA-TLX)</h1>
+    <div class="fields">
+      <span><b>Participante:</b> <span id="fPid"></span></span>
+      <span><b>Tarea:</b> <span id="fTask"></span></span>
+      <span><b>Fecha:</b> <span id="fDate"></span></span>
+    </div>
+  </div>
+  <div id="items"></div>
+  <p id="missMsg" class="hidden">Por favor marque todas las escalas antes de terminar.</p>
+  <div class="row" style="justify-content:flex-end;margin-top:8px"><button id="btnSubmit">Terminar</button></div>
+</section>
+
+<!-- 4. Fin -->
+<section id="vDone" class="sheet hidden">
+  <h1>¡Gracias!</h1>
+  <p>Sus respuestas se guardaron. Por favor avise al investigador.</p>
+  <p id="doneStatus" class="muted" style="font-size:.85rem"></p>
+  <div class="row"><button id="btnNext" class="sec">Siguiente participante (investigador)</button></div>
+</section>
+
+<!-- 5. Datos -->
+<section id="vAdmin" class="sheet hidden">
+  <h1>Datos guardados en esta computadora</h1>
+  <p id="adminInfo" class="muted"></p>
+  <div class="tw"><table id="tbl"></table></div>
+  <div class="row">
+    <button id="btnCsv">Descargar respaldo CSV</button>
+    <button id="btnBack" class="sec">Volver</button>
+    <button id="btnClear" class="dang">Borrar datos locales</button>
+  </div>
+  <p class="muted" style="font-size:.85rem;margin-top:10px">MD = Exigencia mental, PD = Exigencia física, TD = Exigencia temporal, PE = Rendimiento, EF = Esfuerzo, FR = Nivel de frustración. Sufijo _cont = posición continua; sin sufijo = puntaje en la escala de 20 intervalos (marca más cercana × 5).</p>
+</section>
+
+<script src="vendor/msal-browser.min.js"></script>
+<script>
+/* ===================== CONFIGURACIÓN =====================
+   Pegue aquí el "Application (client) ID" de su registro de aplicación en Microsoft Entra.
+   Si queda vacío, el formulario funciona igual pero solo guarda en este navegador. */
+const CLIENT_ID = "";
+/* ========================================================= */
+
+const VERSION = "rtlx-es-papel 1.0";
+const SCOPES = ["Files.ReadWrite.AppFolder"];
+const CSV_NAME = "rtlx_respuestas.csv";
+const K_ALL = "rtlx_es_todas_v1", K_QUEUE = "rtlx_es_pendientes_v1";
+
+const SCALES = [
+  { key:"MD", name:"Exigencia mental", low:"Baja", high:"Alta",
+    desc:"¿Cuánta actividad mental y perceptiva fue necesaria? (Por ejemplo: pensar, decidir, calcular, recordar, buscar, investigar, etc.). ¿Se trata de una tarea fácil o difícil, simple o compleja, pesada o ligera?" },
+  { key:"PD", name:"Exigencia física", low:"Baja", high:"Alta",
+    desc:"¿Cuánta actividad física fue necesaria? (Por ejemplo: empujar, tirar, girar, pulsar, accionar, etc.). ¿Se trata de una tarea fácil o difícil, lenta o rápida, relajada o cansada?" },
+  { key:"TD", name:"Exigencia temporal", low:"Baja", high:"Alta",
+    desc:"¿Cuánta presión de tiempo sintió, debido al ritmo al cual se sucedían las tareas o los elementos de las tareas? ¿Era el ritmo lento y pausado o rápido y frenético?" },
+  { key:"PE", name:"Rendimiento", low:"Bueno", high:"Malo",
+    desc:"¿Hasta qué punto cree que ha tenido éxito en los objetivos establecidos por el investigador (o por usted mismo/a)? ¿Cuál es su grado de satisfacción con su nivel de ejecución?" },
+  { key:"EF", name:"Esfuerzo", low:"Bajo", high:"Alto",
+    desc:"¿En qué medida ha tenido que trabajar (física o mentalmente) para alcanzar su nivel de resultados?" },
+  { key:"FR", name:"Nivel de frustración", low:"Bajo", high:"Alto",
+    desc:"Durante la tarea, ¿en qué medida se ha sentido inseguro/a, desalentado/a, irritado/a, tenso/a o preocupado/a, o por el contrario, se ha sentido seguro/a, contento/a, relajado/a y satisfecho/a?" }
+];
+const COLS = ["id_registro","participante","condicion","tarea","inicio","fin","duracion_seg",
+  ...SCALES.map(s=>s.key), "RTLX", ...SCALES.map(s=>s.key+"_cont"), "RTLX_cont", "ancho_pantalla_px", "version"];
+
+const $ = id => document.getElementById(id);
+const store = {
+  get(k){ try{ return JSON.parse(localStorage.getItem(k)) || []; }catch(e){ return []; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+};
+function show(id){ ["vSetup","vInstr","vForm","vDone","vAdmin"].forEach(v=>$(v).classList.toggle("hidden", v!==id)); window.scrollTo(0,0); }
+
+/* ---------- OneDrive (Microsoft Graph, carpeta de la aplicación) ---------- */
+let pca = null, account = null, flushing = false;
+
+async function initAuth(){
+  if(!CLIENT_ID || typeof msal === "undefined"){ renderStatus(); return; }
+  try{
+    pca = new msal.PublicClientApplication({
+      auth:{ clientId:CLIENT_ID, authority:"https://login.microsoftonline.com/consumers",
+             redirectUri: location.origin + location.pathname },
+      cache:{ cacheLocation:"localStorage" }
+    });
+    await pca.initialize();
+    const r = await pca.handleRedirectPromise();
+    account = (r && r.account) || pca.getAllAccounts()[0] || null;
+  }catch(e){ console.error(e); }
+  renderStatus(); flush();
+}
+async function token(){
+  if(!pca || !account) throw new Error("sin sesión");
+  try{ return (await pca.acquireTokenSilent({ scopes:SCOPES, account })).accessToken; }
+  catch(e){ account = null; renderStatus(); throw e; }
+}
+async function graph(path, opts={}){
+  const t = await token();
+  const res = await fetch("https://graph.microsoft.com/v1.0" + path,
+    { ...opts, headers:{ Authorization:"Bearer "+t, ...(opts.headers||{}) } });
+  return res;
+}
+function csvLine(r){ return COLS.map(c=>{ const v = r[c] ?? ""; return `"${String(v).replace(/"/g,'""')}"`; }).join(","); }
+
+async function uploadOne(r){
+  // 1) Archivo individual (nunca se sobrescribe)
+  let res = await graph(`/me/drive/special/approot:/respuestas/${encodeURIComponent(r.id_registro)}.json:/content`,
+    { method:"PUT", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(r, null, 2) });
+  if(!res.ok) throw new Error("JSON " + res.status);
+  // 2) CSV consolidado, con control de concurrencia (eTag)
+  for(let attempt=0; attempt<4; attempt++){
+    let meta = await graph(`/me/drive/special/approot:/${CSV_NAME}`);
+    let text = "﻿" + COLS.join(",") + "\r\n", etag = null;
+    if(meta.ok){
+      const m = await meta.json(); etag = m.eTag;
+      const c = await graph(`/me/drive/items/${m.id}/content`);
+      if(!c.ok) throw new Error("CSV leer " + c.status);
+      text = await c.text();
+      if(text.includes(`"${r.id_registro}"`)) return; // ya estaba
+      if(!text.endsWith("\n")) text += "\r\n";
+    } else if(meta.status !== 404){ throw new Error("CSV meta " + meta.status); }
+    text += csvLine(r) + "\r\n";
+    const headers = { "Content-Type":"text/csv; charset=utf-8" };
+    if(etag) headers["If-Match"] = etag;
+    res = await graph(`/me/drive/special/approot:/${CSV_NAME}:/content`, { method:"PUT", headers, body:text });
+    if(res.ok) return;
+    if(res.status !== 412 && res.status !== 409) throw new Error("CSV " + res.status);
+    await new Promise(s=>setTimeout(s, 400 + Math.random()*800));
+  }
+  throw new Error("CSV en uso, se reintentará");
+}
+async function flush(){
+  if(flushing || !account) { renderStatus(); return; }
+  flushing = true;
+  try{
+    let q = store.get(K_QUEUE);
+    while(q.length){
+      await uploadOne(q[0]);
+      q = store.get(K_QUEUE); q.shift(); store.set(K_QUEUE, q);
+    }
+  }catch(e){ console.warn("Subida pendiente:", e.message); }
+  flushing = false; renderStatus();
+}
+function renderStatus(){
+  const n = store.get(K_QUEUE).length, s = $("odStatus");
+  $("btnLogin").classList.toggle("hidden", !CLIENT_ID || !!account);
+  $("btnLogout").classList.toggle("hidden", !account);
+  $("btnRetry").classList.toggle("hidden", !account || !n);
+  if(!CLIENT_ID){ s.className="status warn"; s.textContent = "OneDrive no configurado: las respuestas se guardan solo en este navegador. Descargue el respaldo CSV al terminar."; return; }
+  if(!account){ s.className="status warn"; s.textContent = `OneDrive desconectado. ${n} respuesta(s) pendiente(s) de subir. Conecte antes de iniciar.`; return; }
+  s.className = n ? "status warn" : "status ok";
+  s.textContent = `Conectado a OneDrive como ${account.username}. ` + (n ? `${n} respuesta(s) pendiente(s) de subir.` : "Todo sincronizado.");
+}
+$("btnLogin").onclick = () => pca && pca.loginRedirect({ scopes:SCOPES, prompt:"select_account" });
+$("btnLogout").onclick = () => pca && pca.logoutRedirect({ account });
+$("btnRetry").onclick = flush;
+window.addEventListener("online", flush);
+
+/* ---------- Sesión ---------- */
+let sess = {}, answers = {}, cont = {};
+function checkSetup(){ $("btnStart").disabled = !($("inPid").value.trim() && $("inCond").value); }
+$("inPid").oninput = checkSetup; $("inCond").onchange = checkSetup;
+$("btnStart").onclick = () => {
+  sess = { participante:$("inPid").value.trim(), condicion:$("inCond").value, tarea:$("inTask").value.trim() };
+  show("vInstr");
+};
+$("btnToForm").onclick = () => {
+  buildForm();
+  $("fPid").textContent = sess.participante;
+  $("fTask").textContent = sess.tarea || "—";
+  $("fDate").textContent = new Date().toLocaleDateString("es-CR");
+  sess.inicio = new Date();
+  show("vForm");
+};
+
+/* ---------- Escalas ---------- */
+function buildForm(){
+  answers = {}; cont = {};
+  const box = $("items"); box.innerHTML = ""; $("missMsg").classList.add("hidden");
+  SCALES.forEach(s => {
+    const it = document.createElement("div"); it.className = "item"; it.id = "it_"+s.key;
+    it.innerHTML = `<div class="q"><h2>${s.name}</h2><p>${s.desc}</p></div>`;
+    const sc = document.createElement("div"); sc.className = "scale"; sc.tabIndex = 0;
+    sc.setAttribute("role","slider"); sc.setAttribute("aria-label", `${s.name}, de ${s.low} a ${s.high}`);
+    sc.innerHTML = `<div class="base"></div>` +
+      Array.from({length:21},(_,i)=>`<div class="tick${i===10?" mid":""}" style="left:${i*5}%"></div>`).join("") +
+      `<div class="mark hidden"></div>`;
+    const mark = sc.querySelector(".mark");
+    const setPos = p => {
+      p = Math.max(0, Math.min(100, p));
+      cont[s.key] = Math.round(p*10)/10;
+      answers[s.key] = Math.round(p/5)*5;
+      mark.style.left = p + "%"; mark.classList.remove("hidden");
+      it.classList.remove("missing");
+      if(SCALES.every(x => answers[x.key] !== undefined)) $("missMsg").classList.add("hidden");
+    };
+    sc.addEventListener("pointerdown", e => {
+      const r = sc.getBoundingClientRect();
+      setPos((e.clientX - r.left) / r.width * 100);
+    });
+    sc.addEventListener("keydown", e => {
+      if(e.key!=="ArrowLeft" && e.key!=="ArrowRight") return;
+      e.preventDefault();
+      const cur = answers[s.key] ?? 50;
+      setPos(cur + (e.key==="ArrowRight" ? 5 : -5));
+    });
+    const an = document.createElement("div"); an.className = "anch";
+    an.innerHTML = `<span>${s.low}</span><span>${s.high}</span>`;
+    it.appendChild(sc); it.appendChild(an); box.appendChild(it);
+  });
+}
+const mean = a => Math.round(a.reduce((x,y)=>x+y,0)/a.length*100)/100;
+
+$("btnSubmit").onclick = () => {
+  const miss = SCALES.filter(s => answers[s.key] === undefined);
+  SCALES.forEach(s => $("it_"+s.key).classList.toggle("missing", answers[s.key] === undefined));
+  if(miss.length){ $("missMsg").classList.remove("hidden"); $("it_"+miss[0].key).scrollIntoView({behavior:"smooth",block:"center"}); return; }
+  const fin = new Date();
+  const r = {
+    id_registro: `${sess.participante}_${fin.toISOString().replace(/[:.]/g,"-")}`,
+    participante: sess.participante, condicion: sess.condicion, tarea: sess.tarea,
+    inicio: sess.inicio.toISOString(), fin: fin.toISOString(),
+    duracion_seg: Math.round((fin - sess.inicio)/1000),
+    ancho_pantalla_px: window.innerWidth, version: VERSION
+  };
+  SCALES.forEach(s => { r[s.key] = answers[s.key]; r[s.key+"_cont"] = cont[s.key]; });
+  r.RTLX = mean(SCALES.map(s=>answers[s.key]));
+  r.RTLX_cont = mean(SCALES.map(s=>cont[s.key]));
+  const all = store.get(K_ALL); all.push(r);
+  const q = store.get(K_QUEUE); q.push(r);
+  const ok = store.set(K_ALL, all) && store.set(K_QUEUE, q);
+  $("doneStatus").textContent = ok ? "" : "Aviso para el investigador: no se pudo guardar en este navegador.";
+  show("vDone");
+  flush();
+};
+$("btnNext").onclick = () => { $("inPid").value=""; $("inTask").value=""; $("inCond").value=""; checkSetup(); renderStatus(); show("vSetup"); };
+
+/* ---------- Datos locales ---------- */
+function renderAdmin(){
+  const all = store.get(K_ALL), q = store.get(K_QUEUE).length;
+  $("adminInfo").textContent = `${all.length} respuesta(s) en este navegador. ${q} pendiente(s) de subir a OneDrive.`;
+  $("tbl").innerHTML = "<tr>"+COLS.map(c=>`<th>${c}</th>`).join("")+"</tr>" +
+    all.map(r=>"<tr>"+COLS.map(c=>`<td>${r[c] ?? ""}</td>`).join("")+"</tr>").join("");
+}
+$("btnAdmin").onclick = () => { renderAdmin(); show("vAdmin"); };
+$("btnBack").onclick = () => { renderStatus(); show("vSetup"); };
+$("btnCsv").onclick = () => {
+  const csv = "﻿" + COLS.join(",") + "\r\n" + store.get(K_ALL).map(csvLine).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv;charset=utf-8"}));
+  a.download = `rtlx_respaldo_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+};
+$("btnClear").onclick = () => {
+  const q = store.get(K_QUEUE).length;
+  const msg = q ? `Hay ${q} respuesta(s) que todavía NO se subieron a OneDrive y se perderían. ¿Borrar de todas formas?`
+                : "¿Borrar las respuestas guardadas en este navegador? (Ya están en OneDrive.)";
+  if(confirm(msg)){ store.set(K_ALL, []); store.set(K_QUEUE, []); renderAdmin(); }
+};
+
+initAuth();
+</script>
+</body>
+</html>
