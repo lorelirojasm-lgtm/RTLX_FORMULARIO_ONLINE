@@ -25,7 +25,7 @@ Por cada participante se guardan dos tipos de valores:
 - **`*_cont`**: la posición exacta del clic (0–100, con un decimal).
 - **`RTLX`**: el promedio simple de las seis subescalas. También se guarda `RTLX_cont`.
 
-Además se registran: participante, condición, tarea, inicio, fin, duración en segundos, ancho de pantalla, versión y la hora en que la hoja recibió la fila (`recibido`).
+Además se registran: participante (P1–P25), grupo (Mañana/Tarde), condición, tarea, inicio, fin, duración en segundos, ancho de pantalla, versión y la hora en que la hoja recibió la fila (`recibido`).
 
 Cada respuesta se guarda **primero en el navegador** y luego se envía a una **hoja de Google Sheets** en tu Drive, como una fila nueva. Si se cae el internet, queda pendiente y se envía sola después. Si una respuesta llega dos veces, la hoja no la duplica.
 
@@ -59,14 +59,13 @@ Cada respuesta se guarda **primero en el navegador** y luego se envía a una **h
 ## Uso
 **Enlace para estudiantes:** `https://lorelirojasm-lgtm.github.io/RTLX_FORMULARIO_ONLINE/`
 
-1. El estudiante escribe su **código de participante** y toca **Continuar**.
+1. El estudiante elige su **P asignado** (P1 a P25) y su **grupo** (Mañana o Tarde), y toca **Continuar**. Es el mismo formato del formulario del equipo, así que las respuestas se cruzan por `participante` + `grupo`.
 2. Lee las instrucciones y marca las 6 escalas. El formulario no deja terminar si falta alguna.
 3. Al terminar ve **"¡Gracias! Sus respuestas se guardaron correctamente"** solo cuando la hoja confirmó que recibió la fila. Si falla el internet, se le pide no cerrar la página y tocar **Reintentar**.
 
 **Parámetros opcionales del enlace** (se guardan en la hoja sin que el estudiante los vea):
 - `?cond=socratico` o `?cond=prompt`, para mandarle a cada grupo su propio enlace con la condición.
 - `&tarea=T1`, para indicar la tarea.
-- `&id=P01`, para que el código ya aparezca escrito.
 
 **Modo investigador:** agregá `?admin=1` al enlace para ver el estado de la conexión, las respuestas pendientes y el respaldo CSV de ese navegador.
 

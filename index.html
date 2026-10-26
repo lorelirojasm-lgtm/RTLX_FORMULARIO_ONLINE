@@ -35,7 +35,10 @@
   p{margin:0 0 10px}
   .muted{color:var(--muted)}
   .hidden{display:none!important}
-  label.f{display:block;font-weight:bold;margin:12px 0 4px}
+  label.f,legend.f{display:block;font-weight:bold;margin:12px 0 4px;padding:0}
+  fieldset.grp{border:0;margin:6px 0 0;padding:0}
+  fieldset.grp label{display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer}
+  fieldset.grp input{width:18px;height:18px;margin:0}
   input[type=text],select{width:100%;padding:9px;border:1px solid var(--border);border-radius:4px;font:inherit;background:#fff;color:#000}
   button{font:inherit;padding:9px 18px;border-radius:4px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
   button.sec{background:#fff;color:var(--accent)}
@@ -83,10 +86,15 @@
 <!-- 1. Participante: código -->
 <section id="vSetup" class="sheet">
   <h1>Evaluación de la tarea</h1>
-  <p>Escriba el código de participante que le dio el investigador.</p>
+  <p>Seleccione el P que le asignaron y su grupo.</p>
 
-  <label class="f" for="inPid">Código de participante</label>
-  <input id="inPid" type="text" autocomplete="off" placeholder="p. ej. P01">
+  <label class="f" for="inPid">Seleccione el P asignado</label>
+  <select id="inPid" style="max-width:220px"><option value="">Elige</option></select>
+  <fieldset class="grp">
+    <legend class="f">Seleccione su grupo</legend>
+    <label><input type="radio" name="grupo" value="Mañana"> Mañana</label>
+    <label><input type="radio" name="grupo" value="Tarde"> Tarde</label>
+  </fieldset>
 
   <div class="row"><button id="btnStart" disabled>Continuar</button></div>
 
@@ -159,7 +167,7 @@ const SHEETS_URL = "https://script.google.com/macros/s/AKfycbxKXplkME5mIRJgGdA_n
 const SHEETS_KEY = "aOdwXJk-972yVouHRtW72IE5";
 /* ========================================================= */
 
-const VERSION = "rtlx-es-papel 1.3";
+const VERSION = "rtlx-es-papel 1.4";
 const K_ALL = "rtlx_es_todas_v1", K_QUEUE = "rtlx_es_pendientes_v1";
 
 const SCALES = [
@@ -177,7 +185,7 @@ const SCALES = [
   { key:"FR", name:"Nivel de frustración", low:"Bajo", high:"Alto",
     desc:"Durante la tarea, ¿en qué medida se ha sentido inseguro/a, desalentado/a, irritado/a, tenso/a o preocupado/a, o por el contrario, se ha sentido seguro/a, contento/a, relajado/a y satisfecho/a?" }
 ];
-const COLS = ["id_registro","participante","condicion","tarea","inicio","fin","duracion_seg",
+const COLS = ["id_registro","participante","grupo","condicion","tarea","inicio","fin","duracion_seg",
   ...SCALES.map(s=>s.key), "RTLX", ...SCALES.map(s=>s.key+"_cont"), "RTLX_cont", "ancho_pantalla_px", "version"];
 
 const $ = id => document.getElementById(id);
@@ -188,7 +196,7 @@ const store = {
 function show(id){ ["vSetup","vInstr","vForm","vDone","vAdmin"].forEach(v=>$(v).classList.toggle("hidden", v!==id)); window.scrollTo(0,0); }
 
 /* ---------- Google Sheets (Apps Script) ---------- */
-let sheetOk = null, sheetRows = null;
+let sheetOk = null, sheetRows = null, sheetVer = 0;
 function csvLine(r){ return COLS.map(c=>{ const v = r[c] ?? ""; return `"${String(v).replace(/"/g,'""')}"`; }).join(","); }
 
 async function ping(){
@@ -196,7 +204,7 @@ async function ping(){
   try{
     const res = await fetch(`${SHEETS_URL}?clave=${encodeURIComponent(SHEETS_KEY)}`);
     const d = await res.json();
-    sheetOk = !!d.ok; sheetRows = d.filas ?? null;
+    sheetOk = !!d.ok; sheetRows = d.filas ?? null; sheetVer = d.version || 1;
   }catch(e){ sheetOk = false; }
   renderStatus();
 }
@@ -229,6 +237,7 @@ function renderStatus(){
   if(!SHEETS_URL){ s.className="status warn"; s.textContent = "Google Sheets no configurado: las respuestas se guardan solo en este navegador. Descargue el respaldo CSV al terminar."; return; }
   if(sheetOk === null){ s.className="status"; s.textContent = "Verificando conexión con Google Sheets…"; return; }
   if(!sheetOk){ s.className="status warn"; s.textContent = `No se pudo conectar con Google Sheets (revise el internet). ${n} respuesta(s) pendiente(s); se subirán solas al volver la conexión.`; return; }
+  if(sheetVer && sheetVer < 2){ s.className="status warn"; s.textContent = "Conectado, pero el Apps Script de la hoja está desactualizado: no guardará la columna «grupo». Pegue el Code.gs nuevo y publique una nueva versión."; return; }
   s.className = n ? "status warn" : "status ok";
   s.textContent = "Conectado a Google Sheets" + (sheetRows!==null ? ` (${sheetRows} respuesta(s) en la hoja). ` : ". ") + (n ? `${n} pendiente(s) de subir.` : "Todo sincronizado.");
 }
@@ -241,17 +250,20 @@ let sess = {}, answers = {}, cont = {};
 const QS = new URLSearchParams(location.search);
 const ADMIN = QS.get("admin") === "1";
 if(ADMIN) { $("adminBox").classList.remove("hidden"); $("btnNext").classList.remove("hidden"); }
-if(QS.get("id")) $("inPid").value = QS.get("id");
-function checkSetup(){ $("btnStart").disabled = !$("inPid").value.trim(); }
-$("inPid").oninput = checkSetup; checkSetup();
-$("inPid").addEventListener("keydown", e => { if(e.key==="Enter" && !$("btnStart").disabled) $("btnStart").click(); });
+const N_PARTICIPANTES = 25;   // P1…P25 por grupo (mismo formato que el formulario del equipo)
+for(let i=1;i<=N_PARTICIPANTES;i++){ const o=document.createElement("option"); o.value=o.textContent="P"+i; $("inPid").appendChild(o); }
+const grupoSel = () => (document.querySelector('input[name="grupo"]:checked') || {}).value || "";
+function checkSetup(){ $("btnStart").disabled = !($("inPid").value && grupoSel()); }
+$("inPid").onchange = checkSetup;
+document.querySelectorAll('input[name="grupo"]').forEach(r => r.onchange = checkSetup);
+checkSetup();
 $("btnStart").onclick = () => {
-  sess = { participante:$("inPid").value.trim(), condicion:QS.get("cond") || "", tarea:QS.get("tarea") || "" };
+  sess = { participante:$("inPid").value, grupo:grupoSel(), condicion:QS.get("cond") || "", tarea:QS.get("tarea") || "" };
   show("vInstr");
 };
 $("btnToForm").onclick = () => {
   buildForm();
-  $("fPid").textContent = sess.participante;
+  $("fPid").textContent = `${sess.participante} · ${sess.grupo}`;
   $("fTask").textContent = sess.tarea; $("fTaskWrap").classList.toggle("hidden", !sess.tarea);
   $("fDate").textContent = new Date().toLocaleDateString("es-CR");
   sess.inicio = new Date();
@@ -302,8 +314,8 @@ $("btnSubmit").onclick = () => {
   if(miss.length){ $("missMsg").classList.remove("hidden"); $("it_"+miss[0].key).scrollIntoView({behavior:"smooth",block:"center"}); return; }
   const fin = new Date();
   const r = {
-    id_registro: `${sess.participante}_${fin.toISOString().replace(/[:.]/g,"-")}`,
-    participante: sess.participante, condicion: sess.condicion, tarea: sess.tarea,
+    id_registro: `${sess.participante}_${sess.grupo}_${fin.toISOString().replace(/[:.]/g,"-")}`,
+    participante: sess.participante, grupo: sess.grupo, condicion: sess.condicion, tarea: sess.tarea,
     inicio: sess.inicio.toISOString(), fin: fin.toISOString(),
     duracion_seg: Math.round((fin - sess.inicio)/1000),
     ancho_pantalla_px: window.innerWidth, version: VERSION
@@ -325,7 +337,7 @@ async function sendAndConfirm(){
   $(pending ? "dFail" : "dOk").classList.remove("hidden");
 }
 $("btnResend").onclick = sendAndConfirm;
-$("btnNext").onclick = () => { $("inPid").value=""; checkSetup(); renderStatus(); show("vSetup"); };
+$("btnNext").onclick = () => { $("inPid").value=""; document.querySelectorAll('input[name="grupo"]').forEach(r=>r.checked=false); checkSetup(); renderStatus(); show("vSetup"); };
 
 /* ---------- Datos locales ---------- */
 function renderAdmin(){
